@@ -47,6 +47,7 @@ class Character
     public int Defense { get; set; }
     public int Health { get; set; }
     public int Gold { get; set; }
+    public int DungeonClearCount { get; set; } // 던전 클리어 횟수
     public List<Item> Inventory { get; set; }
 
     // 장착된 아이템 변수 정의
@@ -64,6 +65,7 @@ class Character
         equippedArmor = null;
         equippedWeapon = null;
         Inventory = new List<Item>();
+        DungeonClearCount = 0; // 던전 클리어 횟수 초기화
     }
 
     // 인벤토리 관리 메서드
@@ -162,8 +164,11 @@ class Character
     {
         using (StreamWriter writer = new StreamWriter(fileName))
         {
-            writer.WriteLine($"{Name},{CharClass},{Level},{Attack},{Defense},{Health},{Gold}");
+            // 캐릭터 정보 저장
+            writer.WriteLine($"CharacterInfo:{Name},{CharClass},{Level},{Attack},{Defense},{Health},{Gold},{DungeonClearCount}");
 
+            // 인벤토리 아이템 저장
+            writer.WriteLine(Inventory.Count); // 아이템 개수 저장
             foreach (var item in Inventory)
             {
                 writer.WriteLine($"{item.Name},{item.Description},{item.AttackBonus},{item.DefenseBonus},{item.Price},{item.Type},{item.Equipped}");
@@ -174,33 +179,39 @@ class Character
     // 파일로부터 캐릭터 정보를 로드하는 메서드
     public static Character Load(string filename)
     {
-        Character character = new Character("", "", 0, 0, 0, 0);
+        Character character = null;
 
         using (StreamReader reader = new StreamReader(filename))
         {
-            character.Name = reader.ReadLine();
-            character.CharClass = reader.ReadLine();
-            character.Level = int.Parse(reader.ReadLine());
-            character.Attack = int.Parse(reader.ReadLine());
-            character.Defense = int.Parse(reader.ReadLine());
-            character.Health = int.Parse(reader.ReadLine());
-            character.Gold = int.Parse(reader.ReadLine());
-
-            // 인벤토리 아이템 로드
-            int itemCount = int.Parse(reader.ReadLine());
-            for (int i = 0; i < itemCount; i++)
+            string line;
+            while ((line = reader.ReadLine()) != null)
             {
-                string name = reader.ReadLine();
-                string description = reader.ReadLine();
-                int attackBonus = int.Parse(reader.ReadLine());
-                int defenseBonus = int.Parse(reader.ReadLine());
-                int price = int.Parse(reader.ReadLine());
-                bool equipped = bool.Parse(reader.ReadLine());
-                ItemType type = (ItemType)Enum.Parse(typeof(ItemType), reader.ReadLine());
+                // 캐릭터 정보가 있는 줄을 식별하고 파싱
+                if (line.StartsWith("CharacterInfo:"))
+                {
+                    string[] parts = line.Split(':');
+                    if (parts.Length >= 2)
+                    {
+                        string[] info = parts[1].Split(',');
+                        if (info.Length >= 8) // 추가 정보를 포함하므로 8로 변경
+                        {
+                            string name = info[0];
+                            string charClass = info[1];
+                            int level = int.Parse(info[2]);
+                            int attack = int.Parse(info[3]);
+                            int defense = int.Parse(info[4]);
+                            int health = int.Parse(info[5]);
+                            int gold = int.Parse(info[6]);
+                            int dungeonClearCount = int.Parse(info[7]);
 
-                Item item = new Item(name, description, attackBonus, defenseBonus, price, type);
-                item.Equipped = equipped;
-                character.Inventory.Add(item);
+                            // 캐릭터 객체 생성 및 설정
+                            character = new Character(name, charClass, attack, defense, health, gold);
+                            character.Level = level;
+                            character.DungeonClearCount = dungeonClearCount;
+                            // 캐릭터 정보 설정 완료
+                        }
+                    }
+                }
             }
         }
 
@@ -216,20 +227,28 @@ class MainClass
 
         // 아이템 정보 배열
         Item[] itemList = {
-        new Item("해신작쇼", "방어력 +5 | 수련에 도움을 주는 갑옷입니다.", 0, 5, 1000, ItemType.Armor),
-        new Item("가시갑옷", "방어력 +9 | 무쇠로 만들어져 튼튼한 갑옷입니다.", 0, 9, 1800, ItemType.Armor),
-        new Item("건틀릿", "방어력 +15 | 욤마의 전사들이 사용했다는 전설의 갑옷입니다.", 0, 15, 3500, ItemType.Armor),
-        new Item("단검", "공격력 +2 | 쉽게 볼 수 있는 낡은 검 입니다.", 2, 0, 600, ItemType.Weapon),
-        new Item("대검", "공격력 +5 | 어디선가 사용됐던거 같은 검입니다.", 5, 0, 1500, ItemType.Weapon),
-        new Item("그림자검", "공격력 +7 | 욤마의 전사들이 사용했다는 전설의 창입니다.", 7, 0, 2500, ItemType.Weapon)
-    };
+            new Item("해신작쇼", "방어력 +5 | 수련에 도움을 주는 갑옷입니다.", 0, 5, 1000, ItemType.Armor),
+            new Item("가시갑옷", "방어력 +9 | 무쇠로 만들어져 튼튼한 갑옷입니다.", 0, 9, 1800, ItemType.Armor),
+            new Item("건틀릿", "방어력 +15 | 욤마의 전사들이 사용했다는 전설의 갑옷입니다.", 0, 15, 3500, ItemType.Armor),
+            new Item("단검", "공격력 +2 | 쉽게 볼 수 있는 낡은 검 입니다.", 2, 0, 600, ItemType.Weapon),
+            new Item("대검", "공격력 +5 | 어디선가 사용됐던거 같은 검입니다.", 5, 0, 1500, ItemType.Weapon),
+            new Item("그림자검", "공격력 +7 | 욤마의 전사들이 사용했다는 전설의 창입니다.", 7, 0, 2500, ItemType.Weapon)
+        };
 
         // 게임 시작 시, 저장된 파일이 있다면 로드하고 없다면 새로운 캐릭터 생성
         Character player;
         if (File.Exists(saveFileName))
         {
             player = Character.Load(saveFileName);
-            Console.WriteLine("이전 저장된 게임을 로드합니다.");
+            if (player == null)
+            {
+                player = new Character("Chad", "전사", 10, 5, 100, 1500);
+                Console.WriteLine("새로운 게임을 시작합니다.");
+            }
+            else
+            {
+                Console.WriteLine("이전 저장된 게임을 로드합니다.");
+            }
         }
         else
         {
@@ -340,30 +359,28 @@ class MainClass
 
     static void BuyItem(Character player, Item[] itemList)
     {
-        Console.WriteLine("**아이템 구매**");
-        Console.WriteLine("구매할 아이템의 번호를 입력하세요 (0: 나가기):");
-        for (int i = 0; i < itemList.Length; i++)
+        Console.WriteLine("구입하실 아이템의 번호를 입력해주세요.");
+        int choice;
+        if (int.TryParse(Console.ReadLine(), out choice))
         {
-            Console.WriteLine($"{i + 1}. {itemList[i].Name} | {itemList[i].Description} | {itemList[i].Price} G");
-        }
-
-        if (int.TryParse(Console.ReadLine(), out int itemIndex) && itemIndex >= 1 && itemIndex <= itemList.Length)
-        {
-            Item selected = itemList[itemIndex - 1];
-            if (player.Gold >= selected.Price)
+            if (choice > 0 && choice <= itemList.Length)
             {
-                player.Inventory.Add(selected);
-                player.Gold -= selected.Price;
-                Console.WriteLine($"{selected.Name}을(를) 구매했습니다.");
+                Item selected = itemList[choice - 1];
+                if (player.Gold >= selected.Price)
+                {
+                    player.Inventory.Add(selected);
+                    player.Gold -= selected.Price;
+                    Console.WriteLine($"{selected.Name}을(를) 구입하였습니다.");
+                }
+                else
+                {
+                    Console.WriteLine("골드가 부족합니다.");
+                }
             }
             else
             {
-                Console.WriteLine("Gold가 부족합니다.");
+                Console.WriteLine("잘못된 입력입니다.");
             }
-        }
-        else if (itemIndex == 0)
-        {
-            Console.WriteLine("상점으로 돌아갑니다.");
         }
         else
         {
@@ -373,54 +390,35 @@ class MainClass
 
     static void SellItem(Character player, Item[] itemList)
     {
-        Console.WriteLine("**아이템 판매**");
-        Console.WriteLine("판매할 아이템의 번호를 입력하세요 (0: 나가기):");
-        player.ManageInventory();
-
-        if (int.TryParse(Console.ReadLine(), out int itemIndex) && itemIndex >= 1 && itemIndex <= player.Inventory.Count)
+        if (player.Inventory.Count == 0)
         {
-            Item selected = player.Inventory[itemIndex - 1];
-            player.Inventory.RemoveAt(itemIndex - 1);
-            int sellPrice = (int)(selected.Price * 0.85); // 판매 가격은 구매 가격의 85%
-            player.Gold += sellPrice;
-            Console.WriteLine($"{selected.Name}을(를) 판매했습니다. (+{sellPrice} G)");
+            Console.WriteLine("판매할 아이템이 없습니다.");
+            return;
         }
-        else if (itemIndex == 0)
-        {
-            Console.WriteLine("상점으로 돌아갑니다.");
-        }
-        else
-        {
-            Console.WriteLine("잘못된 입력입니다.");
-        }
-    }
 
-    static void Rest(Character player)
-    {
-        Console.WriteLine("**휴식하기**");
-        Console.WriteLine($"500 G를 내면 체력을 회복할 수 있습니다. (보유 골드 : {player.Gold} G)\n");
-        Console.WriteLine("1. 휴식하기");
-        Console.WriteLine("0. 나가기\n");
-
-        if (int.TryParse(Console.ReadLine(), out int choice) && (choice == 1 || choice == 0))
+        Console.WriteLine("판매하실 아이템의 번호를 입력해주세요.");
+        for (int i = 0; i < player.Inventory.Count; i++)
         {
-            switch (choice)
+            Console.WriteLine($"{i + 1}. {player.Inventory[i].Name} | {player.Inventory[i].Price} G");
+        }
+        Console.WriteLine("0. 나가기");
+        int choice;
+        if (int.TryParse(Console.ReadLine(), out choice))
+        {
+            if (choice > 0 && choice <= player.Inventory.Count)
             {
-                case 1:
-                    if (player.Gold >= 500)
-                    {
-                        player.Health = Math.Min(player.Health + 100, 100); // 최대 체력은 100
-                        player.Gold -= 500;
-                        Console.WriteLine("휴식을 완료했습니다.");
-                    }
-                    else
-                    {
-                        Console.WriteLine("Gold가 부족합니다.");
-                    }
-                    break;
-                case 0:
-                    Console.WriteLine("상점으로 돌아갑니다.");
-                    break;
+                Item soldItem = player.Inventory[choice - 1];
+                player.Gold += soldItem.Price;
+                player.Inventory.RemoveAt(choice - 1);
+                Console.WriteLine($"{soldItem.Name}을(를) 판매하였습니다.");
+            }
+            else if (choice == 0)
+            {
+                return;
+            }
+            else
+            {
+                Console.WriteLine("잘못된 입력입니다.");
             }
         }
         else
@@ -436,8 +434,9 @@ class MainClass
         Console.WriteLine("1. 쉬운 던전     | 방어력 5 이상 권장");
         Console.WriteLine("2. 일반 던전     | 방어력 11 이상 권장");
         Console.WriteLine("3. 어려운 던전    | 방어력 17 이상 권장");
-
+        Console.WriteLine("0. 뒤로가기\n");
         Console.WriteLine("원하시는 던전을 선택하세요:");
+
         if (int.TryParse(Console.ReadLine(), out int dungeonChoice))
         {
             switch (dungeonChoice)
@@ -450,6 +449,9 @@ class MainClass
                     break;
                 case 3:
                     EnterDungeon(player, "어려운 던전", 17, 2500);
+                    break;
+                case 0:
+                    Console.WriteLine("뒤로 갑니다.");
                     break;
                 default:
                     Console.WriteLine("잘못된 입력입니다.");
@@ -489,6 +491,24 @@ class MainClass
 
             player.Gold += totalReward;
             Console.WriteLine($"던전 클리어! 보상으로 {totalReward} G를 획득했습니다.");
+            // 레벨업 처리
+            Console.WriteLine($"{player.Name} 님이 레벨업하셨습니다!");
+            player.Level++;
+            player.Attack += 1;
+            player.Defense += 2;
+            Console.WriteLine($"새로운 레벨: {player.Level}");
+            Console.WriteLine($"새로운 공격력: {player.Attack}");
+            Console.WriteLine($"새로운 방어력: {player.Defense}");
+         
         }
+    }
+
+
+
+    static void Rest(Character player)
+    {
+        Console.WriteLine("체력을 회복합니다.");
+        player.Health = 100;
+        Console.WriteLine($"현재 체력: {player.Health}");
     }
 }
